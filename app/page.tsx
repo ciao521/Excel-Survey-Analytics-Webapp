@@ -23,7 +23,7 @@ export default function SurveyAnalysisPage() {
           <div className="flex items-center gap-3">
             <BarChart3 className="h-8 w-8 text-primary" />
             <div>
-              <h1 className="text-3xl font-bold text-foreground">SurveyAnalysis-Watanabe-V0</h1>
+              <h1 className="text-3xl font-bold text-foreground">SurveyAnalysis</h1>
               <p className="text-muted-foreground">アンケート結果の可視化・分析プラットフォーム</p>
             </div>
           </div>

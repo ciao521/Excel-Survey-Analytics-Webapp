@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
-import { Filter, X, Search } from "lucide-react"
+import { Filter, X, Search, Download, FileSpreadsheet, Printer, ImageIcon } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 
@@ -349,6 +349,32 @@ export default function DataVisualization({ data }: DataVisualizationProps) {
     }
   }
 
+  const handleExportXLSX = async () => {
+    try {
+      // 動的インポート
+      const XLSX = await import("xlsx")
+
+      // ワークシートデータを準備
+      const worksheetData = [
+        displayedColumns, // ヘッダー行
+        ...filteredData.map((row) => displayedColumns.map((col) => row[col] || "")),
+      ]
+
+      // ワークブックとワークシートを作成
+      const workbook = XLSX.utils.book_new()
+      const worksheet = XLSX.utils.aoa_to_sheet(worksheetData)
+
+      // ワークシートをワークブックに追加
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Survey Data")
+
+      // ファイルを保存
+      XLSX.writeFile(workbook, `survey-analysis-${new Date().toISOString().split("T")[0]}.xlsx`)
+    } catch (error) {
+      console.error("[v0] XLSX出力エラー:", error)
+      alert(`XLSX出力に失敗しました: ${error instanceof Error ? error.message : "不明なエラー"}`)
+    }
+  }
+
   const clearFilters = () => {
     setSelectedRespondents([])
     setSelectedQuestions([])
@@ -477,9 +503,73 @@ export default function DataVisualization({ data }: DataVisualizationProps) {
           </CardContent>
         </Card>
 
+        {/* Export and Print Buttons */}
+        <Card className="no-print">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Download className="h-5 w-5" />
+              エクスポート・印刷
+            </CardTitle>
+            <CardDescription>
+              フィルター適用後のデータ（{filteredData.length}件）をエクスポートまたは印刷できます
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                onClick={handleExportXLSX}
+                variant="outline"
+                className="gap-2 bg-transparent"
+                disabled={filteredData.length === 0}
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                XLSX出力
+              </Button>
+              <Button
+                onClick={handleExportCSV}
+                variant="outline"
+                className="gap-2 bg-transparent"
+                disabled={filteredData.length === 0}
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                CSV出力
+              </Button>
+              <Button
+                onClick={handlePrint}
+                variant="outline"
+                className="gap-2 bg-transparent"
+                disabled={filteredData.length === 0}
+              >
+                <Printer className="h-4 w-4" />
+                印刷
+              </Button>
+              <Button
+                onClick={handleSaveAsImage}
+                variant="outline"
+                className="gap-2 bg-transparent"
+                disabled={isExporting || filteredData.length === 0}
+              >
+                <ImageIcon className="h-4 w-4" />
+                {isExporting ? "保存中..." : "画像保存"}
+              </Button>
+              {selectedQuestions.length > 0 && chartData.length > 0 && (
+                <Button
+                  onClick={handleSaveChartAsImage}
+                  variant="outline"
+                  className="gap-2 bg-transparent"
+                  disabled={isExporting}
+                >
+                  <ImageIcon className="h-4 w-4" />
+                  {isExporting ? "チャート保存中..." : "チャート画像保存"}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         <div ref={contentRef} className="print-content space-y-6">
           <div className="hidden print:block mb-6">
-            <h1 className="text-2xl font-bold mb-2">SurveyAnalysis-Watanabe-V0 分析レポート</h1>
+            <h1 className="text-2xl font-bold mb-2">SurveyAnalysis 分析レポート</h1>
             <p className="text-sm text-muted-foreground">生成日時: {new Date().toLocaleString("ja-JP")}</p>
             {(selectedRespondents.length > 0 || selectedQuestions.length > 0 || searchTerm) && (
               <div className="mt-2">
