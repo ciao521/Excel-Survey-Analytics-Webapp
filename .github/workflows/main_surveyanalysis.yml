@@ -52,4 +52,4 @@ jobs:
           app-name: 'surveyanalysis'
           slot-name: 'Production'
           package: .
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_1E192E80561542C99F579FF2F68BA02D }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_80D22FB175A8488BA69B479ABA80DB48 }}
