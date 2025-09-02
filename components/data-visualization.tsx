@@ -203,6 +203,11 @@ export default function DataVisualization({ data }: DataVisualizationProps) {
       return
     }
 
+    if (filteredData.length === 0) {
+      alert("保存可能なデータがありません")
+      return
+    }
+
     setIsExporting(true)
     try {
       console.log("[v0] Starting image export...")
@@ -210,9 +215,16 @@ export default function DataVisualization({ data }: DataVisualizationProps) {
       // 動的インポート
       const html2canvas = (await import("html2canvas")).default
 
-      // チャートの描画完了を待つ
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      // DOMの更新とチャートの描画完了を待つ
+      await new Promise((resolve) => setTimeout(resolve, 2000))
 
+      // スクロール位置を一時的に保存
+      const scrollPos = {
+        x: window.pageXOffset,
+        y: window.pageYOffset
+      }
+
+      // canvas作成時の設定
       const canvas = await html2canvas(contentRef.current, {
         scale: 2,
         useCORS: true,
@@ -221,16 +233,45 @@ export default function DataVisualization({ data }: DataVisualizationProps) {
         logging: true,
         width: contentRef.current.scrollWidth,
         height: contentRef.current.scrollHeight,
+        windowWidth: contentRef.current.scrollWidth,
+        windowHeight: contentRef.current.scrollHeight,
+        scrollX: -window.pageXOffset,
+        scrollY: -window.pageYOffset,
+        onclone: (clonedDoc: Document) => {
+          const clonedElement = clonedDoc.querySelector('[data-export-container]') as HTMLElement | null
+          if (clonedElement && contentRef.current) {
+            clonedElement.style.width = `${contentRef.current.scrollWidth}px`
+            clonedElement.style.height = `${contentRef.current.scrollHeight}px`
+          }
+        }
       })
 
       console.log("[v0] Canvas created successfully")
 
+      // canvasデータをBlobに変換
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (blob: Blob | null) => {
+            if (blob) {
+              resolve(blob)
+            } else {
+              reject(new Error('Canvas to Blob conversion failed'))
+            }
+          },
+          'image/png',
+          1.0
+        )
+      })
+
+      // Blobからダウンロードリンクを作成
+      const url = URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.download = `survey-analysis-${new Date().toISOString().split("T")[0]}.png`
-      link.href = canvas.toDataURL("image/png")
+      link.href = url
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
+      URL.revokeObjectURL(url)
 
       console.log("[v0] Image saved successfully")
     } catch (error) {
@@ -257,10 +298,11 @@ export default function DataVisualization({ data }: DataVisualizationProps) {
     try {
       console.log("[v0] Starting chart export...")
 
+      // 動的インポート
       const html2canvas = (await import("html2canvas")).default
 
       // チャートの描画完了を待つ
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      await new Promise((resolve) => setTimeout(resolve, 2000))
 
       const canvas = await html2canvas(chartRef.current, {
         scale: 2,
@@ -268,18 +310,55 @@ export default function DataVisualization({ data }: DataVisualizationProps) {
         allowTaint: true,
         backgroundColor: "#ffffff",
         logging: true,
+        windowWidth: chartRef.current.scrollWidth,
+        windowHeight: chartRef.current.scrollHeight,
+        width: chartRef.current.scrollWidth,
+        height: chartRef.current.scrollHeight,
+        scrollX: 0,
+        scrollY: 0,
+        onclone: (clonedDoc: Document) => {
+          const clonedCharts = clonedDoc.querySelectorAll('.recharts-wrapper')
+          clonedCharts.forEach((chart: Element) => {
+            if (chart instanceof HTMLElement) {
+              chart.style.backgroundColor = '#ffffff'
+            }
+          })
+        }
       })
 
       console.log("[v0] Chart canvas created successfully")
 
-      const link = document.createElement("a")
-      link.download = `chart-${selectedQuestions[0].replace(/[^a-zA-Z0-9]/g, "_")}-${new Date().toISOString().split("T")[0]}.png`
-      link.href = canvas.toDataURL("image/png")
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
+      try {
+        // Blobの作成
+        const blob = await new Promise<Blob>((resolve, reject) => {
+          canvas.toBlob(
+            (blob: Blob | null) => {
+              if (blob) {
+                resolve(blob)
+              } else {
+                reject(new Error('Canvas to Blob conversion failed'))
+              }
+            },
+            'image/png',
+            1.0
+          )
+        })
 
-      console.log("[v0] Chart image saved successfully")
+        // ダウンロードリンクの作成と実行
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement("a")
+        link.download = `chart-${selectedQuestions[0].replace(/[^a-zA-Z0-9]/g, "_")}-${new Date().toISOString().split("T")[0]}.png`
+        link.href = url
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+
+        console.log("[v0] Chart image saved successfully")
+      } catch (error) {
+        console.error("[v0] Chart blob creation error:", error)
+        throw new Error('チャート画像の変換中にエラーが発生しました')
+      }
     } catch (error) {
       console.error("[v0] チャート保存エラー:", error)
       alert(`チャート保存に失敗しました: ${error instanceof Error ? error.message : "不明なエラー"}`)
@@ -381,7 +460,7 @@ export default function DataVisualization({ data }: DataVisualizationProps) {
     setSearchTerm("")
   }
 
-  const colors = ["#8884d8", "#82ca9d", "#ffc658", "#ff7300", "#00ff00"]
+  const colors = ["#4a6baf", "#6baf4a", "#af874a", "#af4a4a", "#4aaf9b"]
 
   return (
     <>
@@ -543,31 +622,11 @@ export default function DataVisualization({ data }: DataVisualizationProps) {
                 <Printer className="h-4 w-4" />
                 印刷
               </Button>
-              <Button
-                onClick={handleSaveAsImage}
-                variant="outline"
-                className="gap-2 bg-transparent"
-                disabled={isExporting || filteredData.length === 0}
-              >
-                <ImageIcon className="h-4 w-4" />
-                {isExporting ? "保存中..." : "画像保存"}
-              </Button>
-              {selectedQuestions.length > 0 && chartData.length > 0 && (
-                <Button
-                  onClick={handleSaveChartAsImage}
-                  variant="outline"
-                  className="gap-2 bg-transparent"
-                  disabled={isExporting}
-                >
-                  <ImageIcon className="h-4 w-4" />
-                  {isExporting ? "チャート保存中..." : "チャート画像保存"}
-                </Button>
-              )}
             </div>
           </CardContent>
         </Card>
 
-        <div ref={contentRef} className="print-content space-y-6">
+        <div ref={contentRef} className="print-content space-y-6" data-export-container>
           <div className="hidden print:block mb-6">
             <h1 className="text-2xl font-bold mb-2">SurveyAnalysis 分析レポート</h1>
             <p className="text-sm text-muted-foreground">生成日時: {new Date().toLocaleString("ja-JP")}</p>
@@ -688,10 +747,10 @@ export default function DataVisualization({ data }: DataVisualizationProps) {
                           <XAxis dataKey="response" angle={-45} textAnchor="end" height={80} interval={0} />
                           <YAxis />
                           <Tooltip
-                            formatter={(value, name) => [value, "回答数"]}
-                            labelFormatter={(label) => `回答: ${label}`}
+                            formatter={(value: number, name: string) => [value, "回答数"]}
+                            labelFormatter={(label: string) => `回答: ${label}`}
                           />
-                          <Bar dataKey="count" fill="#1e3a8a" />
+                          <Bar dataKey="count" fill="#4a6baf" />
                         </BarChart>
                       </ResponsiveContainer>
                     </CardContent>
@@ -710,7 +769,7 @@ export default function DataVisualization({ data }: DataVisualizationProps) {
                             cx="50%"
                             cy="50%"
                             labelLine={false}
-                            label={({ response, percentage }) => `${response} (${percentage}%)`}
+                            label={({ response, percentage }: { response: string; percentage: number }) => `${response} (${percentage}%)`}
                             outerRadius={80}
                             fill="#8884d8"
                             dataKey="count"
@@ -719,7 +778,7 @@ export default function DataVisualization({ data }: DataVisualizationProps) {
                               <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
                             ))}
                           </Pie>
-                          <Tooltip formatter={(value, name) => [value, "回答数"]} />
+                          <Tooltip formatter={(value: number, name: string) => [value, "回答数"]} />
                         </PieChart>
                       </ResponsiveContainer>
                     </CardContent>
